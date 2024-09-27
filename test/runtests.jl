@@ -402,7 +402,16 @@ include("setup.jl")
                 json = download_json("$get_url?id=$id", downloader = downloader)
                 @test get(json["args"], "id", nothing) == ["$id"]
             end
-            
+
+            thread_count=Base.Threads.nthreads()
+            @info("starting concurrent requests test",
+                get_url=get_url,
+                post_url=post_url,
+                thread_count=thread_count,
+            )
+            # thread_options = (thread_count > 1 ? (false, true) : (true,))
+            thread_options = (false, true)
+
             for downloader in (nothing, mine)
                 have_lsof = Sys.which("lsof") !== nothing
                 count_tcp() = Base.count(x->contains("TCP",x), split(read(`lsof -p $(getpid())`, String), '\n'))
@@ -410,12 +419,10 @@ include("setup.jl")
                     n_tcp = count_tcp()
                 end
                 for method in (:get, :post)
-                    for use_threads in (false, true)
+                    for use_threads in thread_options
                         @info("concurrent requests test",
                             is_default_downloader=(downloader === nothing),
                             method=method,
-                            get_url=get_url,
-                            thread_count=Base.Threads.nthreads(),
                             use_threads=use_threads,
                         )
                         t = @elapsed @sync for id = 1:count
